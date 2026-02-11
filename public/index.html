@@ -140,6 +140,29 @@ tbody tr:hover{background:#f5f7ff}
 .msg-tool .msg-role{color:var(--info)}
 .tools-grid{display:flex;flex-wrap:wrap;gap:6px}
 .tool-chip{padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:20px;font-size:11px;font-weight:500;color:var(--text-secondary)}
+
+/* ── Tool Call Groups ── */
+.tool-call-group{border:1.5px solid #c7d2fe;border-radius:var(--radius);overflow:hidden;background:var(--surface)}
+.tool-call-header{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--info-light);border-bottom:1px solid #c7d2fe;cursor:default}
+.tool-call-header .tool-icon{width:22px;height:22px;background:var(--info);border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0}
+.tool-call-header .tool-fn-name{font-size:13px;font-weight:700;color:var(--info);font-family:'Fira Code',monospace}
+.tool-call-header .tool-call-id{font-size:10px;color:var(--text-tertiary);margin-left:auto;font-family:monospace;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.tool-call-section{padding:10px 14px;border-bottom:1px solid var(--border-light)}
+.tool-call-section:last-child{border-bottom:none}
+.tool-call-section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text-tertiary);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.tool-call-section-label .arrow{font-size:9px;color:var(--text-tertiary)}
+.tool-call-args{background:#f5f7fa;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;font-family:'Fira Code',monospace;font-size:11.5px;line-height:1.5;white-space:pre-wrap;word-break:break-all;color:var(--text-secondary);max-height:250px;overflow:auto}
+
+.tool-response-section{padding:10px 14px}
+.tool-response-ok{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:var(--radius-sm);padding:10px 12px;font-family:'Fira Code',monospace;font-size:11.5px;line-height:1.5;white-space:pre-wrap;word-break:break-all;color:#166534;max-height:300px;overflow:auto}
+.tool-response-err{background:#fef2f2;border:1px solid #fecaca;border-radius:var(--radius-sm);padding:10px 12px;font-family:'Fira Code',monospace;font-size:11.5px;line-height:1.5;white-space:pre-wrap;word-break:break-all;color:#991b1b;max-height:300px;overflow:auto}
+
+.msg-assistant-tool-calls{background:var(--success-light);border:1px solid #bbf7d0}
+.msg-assistant-tool-calls .msg-role{color:#059669}
+.tool-calls-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.tool-call-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;background:var(--info-light);color:var(--info);border:1px solid #c7d2fe;border-radius:20px;font-size:11px;font-weight:600;font-family:'Fira Code',monospace}
+.tool-call-badge .fn-arrow{color:var(--text-tertiary);font-size:10px}
 .cost-breakdown{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .cost-box{text-align:center;padding:14px;border-radius:var(--radius);border:1px solid var(--border)}
 .cost-box .lbl{font-size:11px;color:var(--text-tertiary);font-weight:500}
@@ -211,6 +234,10 @@ tbody tr:hover{background:#f5f7ff}
     <!-- Toolbar -->
     <div class="toolbar">
       <select class="date-select" id="date-select"><option value="">Loading dates...</option></select>
+      <select class="date-select" id="sort-select">
+        <option value="desc">Newest first</option>
+        <option value="asc">Oldest first</option>
+      </select>
       <input class="search-input" id="search-input" type="text" placeholder="Search by model, ID, API key..."/>
       <div class="toolbar-spacer"></div>
       <span class="page-info" id="page-info"></span>
@@ -265,6 +292,7 @@ tbody tr:hover{background:#f5f7ff}
   let totalCount = 0;
   let summaries = [];
   let searchTerm = '';
+  let sortOrder = 'desc';
 
   // ── Elements ──
   const $loginView = document.getElementById('login-view');
@@ -274,6 +302,7 @@ tbody tr:hover{background:#f5f7ff}
   const $loginError = document.getElementById('login-error');
   const $dateSelect = document.getElementById('date-select');
   const $searchInput = document.getElementById('search-input');
+  const $sortSelect = document.getElementById('sort-select');
   const $tracesBody = document.getElementById('traces-body');
   const $tableLoading = document.getElementById('table-loading');
   const $tableEmpty = document.getElementById('table-empty');
@@ -353,7 +382,7 @@ tbody tr:hover{background:#f5f7ff}
     $tableLoading.style.display = 'flex';
     $pagination.innerHTML = '';
     try {
-      const data = await api(`/api/summaries?date=${currentDate}&page=${currentPage}&pageSize=${pageSize}`);
+      const data = await api(`/api/summaries?date=${currentDate}&page=${currentPage}&pageSize=${pageSize}&sort=${sortOrder}`);
       summaries = data.summaries || [];
       totalPages = data.totalPages || 1;
       totalCount = data.totalCount || 0;
@@ -514,16 +543,127 @@ tbody tr:hover{background:#f5f7ff}
       html += '</div></div>';
     }
 
+    // Build tool_call_id → {name, arguments} lookup from assistant messages
+    const toolCallMap = {};
+    msgs.forEach(m => {
+      if (m.role === 'assistant' && m.tool_calls) {
+        m.tool_calls.forEach(tc => {
+          toolCallMap[tc.id] = { name: tc.function?.name || 'unknown', arguments: tc.function?.arguments || '{}' };
+        });
+      }
+    });
+
+    // Build tool_call_id → response content lookup from tool messages
+    const toolResponseMap = {};
+    msgs.forEach(m => {
+      if (m.role === 'tool' && m.tool_call_id) {
+        toolResponseMap[m.tool_call_id] = m.content || '';
+      }
+    });
+
     // Messages
     html += '<div class="detail-section"><h3>Conversation <span class="badge">'+msgs.length+' messages</span></h3>';
     html += '<div class="msg-list">';
+    const renderedToolIds = new Set();
     msgs.forEach(m => {
       const role = m.role || 'unknown';
+
+      // ── Assistant message with tool_calls ──
+      if (role === 'assistant' && m.tool_calls && m.tool_calls.length > 0) {
+        // Show assistant text content if any
+        let assistantText = '';
+        if (typeof m.content === 'string' && m.content.trim()) assistantText = m.content;
+        if (assistantText) {
+          html += '<div class="msg-bubble msg-assistant"><div class="msg-role">assistant</div>'+esc(assistantText)+'</div>';
+        }
+        // Render each tool call as a grouped card with its response
+        m.tool_calls.forEach(tc => {
+          const fnName = tc.function?.name || 'unknown';
+          const fnArgs = tc.function?.arguments || '{}';
+          const tcId = tc.id || '';
+          renderedToolIds.add(tcId);
+
+          let prettyArgs = fnArgs;
+          try { prettyArgs = JSON.stringify(JSON.parse(fnArgs), null, 2); } catch(e) {}
+
+          // Find the matching tool response
+          const responseContent = toolResponseMap[tcId];
+
+          html += '<div class="tool-call-group">';
+          // Header
+          html += '<div class="tool-call-header">';
+          html += '<div class="tool-icon">&#x2699;</div>';
+          html += '<span class="tool-fn-name">'+esc(fnName)+'</span>';
+          if (tcId) html += '<span class="tool-call-id" title="'+esc(tcId)+'">'+esc(tcId)+'</span>';
+          html += '</div>';
+
+          // Arguments section
+          html += '<div class="tool-call-section">';
+          html += '<div class="tool-call-section-label"><span class="arrow">&#x25B6;</span> Arguments</div>';
+          html += '<div class="tool-call-args">'+esc(prettyArgs)+'</div>';
+          html += '</div>';
+
+          // Response section (if available)
+          if (responseContent !== undefined) {
+            let prettyResponse = responseContent;
+            let isError = false;
+            try {
+              const parsed = JSON.parse(responseContent);
+              prettyResponse = JSON.stringify(parsed, null, 2);
+              isError = parsed.error != null || parsed.success === false;
+            } catch(e) {}
+            html += '<div class="tool-call-section">';
+            html += '<div class="tool-call-section-label"><span class="arrow">&#x25C0;</span> Response</div>';
+            html += '<div class="'+(isError ? 'tool-response-err' : 'tool-response-ok')+'">'+esc(prettyResponse)+'</div>';
+            html += '</div>';
+          }
+
+          html += '</div>'; // end tool-call-group
+        });
+        return;
+      }
+
+      // ── Tool response message (already rendered above if paired) ──
+      if (role === 'tool' && m.tool_call_id && renderedToolIds.has(m.tool_call_id)) {
+        return; // skip, already rendered inline with its tool_call
+      }
+
+      // ── Standalone tool response (orphan, no matching assistant tool_call found) ──
+      if (role === 'tool') {
+        const tcInfo = m.tool_call_id ? toolCallMap[m.tool_call_id] : null;
+        const fnName = tcInfo ? tcInfo.name : (m.name || 'tool');
+        let responseContent = '';
+        if (typeof m.content === 'string') responseContent = m.content;
+        else responseContent = JSON.stringify(m.content, null, 2);
+
+        let prettyResponse = responseContent;
+        let isError = false;
+        try {
+          const parsed = JSON.parse(responseContent);
+          prettyResponse = JSON.stringify(parsed, null, 2);
+          isError = parsed.error != null || parsed.success === false;
+        } catch(e) {}
+
+        html += '<div class="tool-call-group">';
+        html += '<div class="tool-call-header">';
+        html += '<div class="tool-icon">&#x2699;</div>';
+        html += '<span class="tool-fn-name">'+esc(fnName)+'</span>';
+        html += '</div>';
+        html += '<div class="tool-call-section">';
+        html += '<div class="tool-call-section-label"><span class="arrow">&#x25C0;</span> Response</div>';
+        html += '<div class="'+(isError ? 'tool-response-err' : 'tool-response-ok')+'">'+esc(prettyResponse)+'</div>';
+        html += '</div>';
+        html += '</div>';
+        return;
+      }
+
+      // ── Standard messages (system, user, assistant without tool_calls) ──
       const cls = role === 'system' ? 'msg-system' : role === 'user' ? 'msg-user' : role === 'assistant' ? 'msg-assistant' : 'msg-tool';
       let content = '';
       if (typeof m.content === 'string') content = m.content;
       else if (Array.isArray(m.content)) content = m.content.map(c => c.text || JSON.stringify(c)).join('\n');
-      else content = JSON.stringify(m.content, null, 2);
+      else if (m.content != null) content = JSON.stringify(m.content, null, 2);
+      else content = '';
       // Truncate very long system prompts in display
       const truncated = content.length > 800 ? content.slice(0,800)+'…\n\n[truncated – '+content.length+' chars total]' : content;
       html += '<div class="msg-bubble '+cls+'"><div class="msg-role">'+esc(role)+'</div>'+esc(truncated)+'</div>';
@@ -618,6 +758,12 @@ tbody tr:hover{background:#f5f7ff}
 
   $dateSelect.addEventListener('change', () => {
     currentDate = $dateSelect.value;
+    currentPage = 1;
+    loadSummaries();
+  });
+
+  $sortSelect.addEventListener('change', () => {
+    sortOrder = $sortSelect.value;
     currentPage = 1;
     loadSummaries();
   });

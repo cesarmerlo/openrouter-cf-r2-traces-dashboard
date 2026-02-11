@@ -119,24 +119,32 @@ async function handleGetTraceSummaries(url: URL, env: AppEnv): Promise<Response>
 	const date = url.searchParams.get("date");
 	if (!date) return json({ error: "Missing date parameter" }, 400);
 
+	const sortOrder = url.searchParams.get("sort") === "asc" ? "asc" : "desc";
+
 	const prefix = `${BUCKET_PREFIX}${date}/`;
 	let cursor: string | undefined;
-	const keys: string[] = [];
+	const entries: { key: string; uploaded: string }[] = [];
 
 	do {
 		const listed = await env.TRACES_BUCKET.list({ prefix, cursor, limit: 500 });
 		for (const obj of listed.objects) {
-			keys.push(obj.key);
+			entries.push({ key: obj.key, uploaded: obj.uploaded.toISOString() });
 		}
 		cursor = listed.truncated ? listed.cursor : undefined;
 	} while (cursor);
 
-	const limit = Math.min(keys.length, 50);
+	// Sort by uploaded timestamp
+	entries.sort((a, b) =>
+		sortOrder === "asc"
+			? a.uploaded.localeCompare(b.uploaded)
+			: b.uploaded.localeCompare(a.uploaded)
+	);
+
 	const page = parseInt(url.searchParams.get("page") || "1");
 	const pageSize = parseInt(url.searchParams.get("pageSize") || "20");
 	const start = (page - 1) * pageSize;
-	const end = Math.min(start + pageSize, keys.length);
-	const pageKeys = keys.slice(start, end);
+	const end = Math.min(start + pageSize, entries.length);
+	const pageKeys = entries.slice(start, end).map((e) => e.key);
 
 	const summaries = await Promise.all(
 		pageKeys.map(async (key) => {
@@ -177,8 +185,9 @@ async function handleGetTraceSummaries(url: URL, env: AppEnv): Promise<Response>
 		date,
 		page,
 		pageSize,
-		totalCount: keys.length,
-		totalPages: Math.ceil(keys.length / pageSize),
+		sort: sortOrder,
+		totalCount: entries.length,
+		totalPages: Math.ceil(entries.length / pageSize),
 		summaries: summaries.filter(Boolean),
 	});
 }
