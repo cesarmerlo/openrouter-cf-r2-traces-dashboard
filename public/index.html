@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>OpenRouter Traces</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f8f9fb;--surface:#ffffff;--border:#e2e6ed;--border-light:#f0f2f5;
+  --text:#1a1d26;--text-secondary:#5f6980;--text-tertiary:#8b95a9;
+  --primary:#4f6ef7;--primary-hover:#3b5de7;--primary-light:#eef1fe;
+  --success:#10b981;--success-light:#ecfdf5;
+  --warning:#f59e0b;--warning-light:#fffbeb;
+  --danger:#ef4444;--danger-light:#fef2f2;
+  --info:#6366f1;--info-light:#eef2ff;
+  --radius:10px;--radius-sm:6px;--radius-lg:14px;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.04);
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:0 4px 12px rgba(0,0,0,.08);
+  --shadow-lg:0 12px 40px rgba(0,0,0,.12);
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+}
+html{font-family:var(--font);font-size:14px;color:var(--text);background:var(--bg)}
+body{min-height:100vh}
+a{color:var(--primary);text-decoration:none}
+button{font-family:var(--font);cursor:pointer;border:none;background:none}
+input{font-family:var(--font)}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-tertiary)}
+
+/* ── LOGIN ── */
+#login-view{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#eef1fe 0%,#f8f9fb 50%,#ecfdf5 100%)}
+.login-card{background:var(--surface);border-radius:var(--radius-lg);padding:40px;width:380px;box-shadow:var(--shadow-lg);text-align:center}
+.login-card h1{font-size:22px;font-weight:700;margin-bottom:4px}
+.login-card p{color:var(--text-secondary);margin-bottom:28px;font-size:13px}
+.login-card .logo{width:48px;height:48px;background:var(--primary);border-radius:12px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:16px;color:#fff;font-weight:700;font-size:20px}
+.login-input{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius);font-size:14px;outline:none;transition:border .2s}
+.login-input:focus{border-color:var(--primary)}
+.login-btn{width:100%;padding:11px;background:var(--primary);color:#fff;font-weight:600;border-radius:var(--radius);font-size:14px;margin-top:14px;transition:background .2s}
+.login-btn:hover{background:var(--primary-hover)}
+.login-error{color:var(--danger);font-size:12px;margin-top:10px;min-height:18px}
+
+/* ── SHELL ── */
+#app-view{display:none}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 28px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar-left{display:flex;align-items:center;gap:12px}
+.topbar-logo{width:32px;height:32px;background:var(--primary);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px}
+.topbar h1{font-size:16px;font-weight:700}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.btn-ghost{padding:6px 12px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;color:var(--text-secondary);transition:all .15s}
+.btn-ghost:hover{background:var(--bg);color:var(--text)}
+.btn-outline{padding:6px 14px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:500;color:var(--text-secondary);transition:all .15s}
+.btn-outline:hover{border-color:var(--primary);color:var(--primary)}
+.btn-primary{padding:7px 16px;background:var(--primary);color:#fff;border-radius:var(--radius-sm);font-size:13px;font-weight:600;transition:background .15s}
+.btn-primary:hover{background:var(--primary-hover)}
+
+.main-content{max-width:1360px;margin:0 auto;padding:24px 28px}
+
+/* ── STATS ROW ── */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow-sm)}
+.stat-card .label{font-size:12px;font-weight:500;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.stat-card .value{font-size:24px;font-weight:700;color:var(--text)}
+.stat-card .sub{font-size:12px;color:var(--text-secondary);margin-top:2px}
+
+/* ── TOOLBAR ── */
+.toolbar{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.date-select{padding:8px 12px;border:1.5px solid var(--border);border-radius:var(--radius);font-size:13px;font-weight:500;background:var(--surface);color:var(--text);outline:none;cursor:pointer;min-width:160px;transition:border .2s}
+.date-select:focus{border-color:var(--primary)}
+.search-input{padding:8px 12px 8px 34px;border:1.5px solid var(--border);border-radius:var(--radius);font-size:13px;background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%238b95a9' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='7' cy='7' r='4.5'/%3E%3Cline x1='10.2' y1='10.2' x2='14' y2='14'/%3E%3C/svg%3E") 10px center no-repeat;outline:none;min-width:240px;transition:border .2s}
+.search-input:focus{border-color:var(--primary)}
+.toolbar-spacer{flex:1}
+.page-info{font-size:12px;color:var(--text-tertiary);font-weight:500}
+
+/* ── TABLE ── */
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);overflow:hidden}
+table{width:100%;border-collapse:collapse}
+thead{background:var(--bg)}
+th{text-align:left;padding:10px 16px;font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:12px 16px;border-bottom:1px solid var(--border-light);font-size:13px;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr{cursor:pointer;transition:background .1s}
+tbody tr:hover{background:#f5f7ff}
+.cell-model{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;background:var(--primary-light);color:var(--primary);border-radius:20px;font-size:12px;font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cell-tokens{font-variant-numeric:tabular-nums;font-size:12px;color:var(--text-secondary)}
+.cell-cost{font-variant-numeric:tabular-nums;font-weight:600;color:var(--success)}
+.cell-duration{font-variant-numeric:tabular-nums;color:var(--text-secondary);font-size:12px}
+.cell-time{white-space:nowrap;color:var(--text-secondary);font-size:12px}
+.cell-id{font-family:monospace;font-size:11px;color:var(--text-tertiary);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cell-apikey{font-size:12px;padding:2px 8px;background:var(--warning-light);color:#b45309;border-radius:20px;font-weight:500;white-space:nowrap}
+.cell-reason{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500;text-transform:capitalize}
+.reason-stop{background:var(--success-light);color:#059669}
+.reason-length{background:var(--warning-light);color:#b45309}
+.reason-tool_calls{background:var(--info-light);color:var(--info)}
+.cell-msgs{font-size:12px;color:var(--text-tertiary)}
+
+/* ── PAGINATION ── */
+.pagination{display:flex;align-items:center;justify-content:center;gap:6px;padding:16px}
+.pagination button{min-width:34px;height:34px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;color:var(--text-secondary);border:1px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;transition:all .15s}
+.pagination button:hover:not(:disabled){border-color:var(--primary);color:var(--primary)}
+.pagination button:disabled{opacity:.4;cursor:not-allowed}
+.pagination button.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* ── DETAIL MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(15,18,30,.45);z-index:100;display:none;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;backdrop-filter:blur(2px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:var(--radius-lg);width:100%;max-width:960px;box-shadow:var(--shadow-lg);animation:modalIn .2s ease}
+@keyframes modalIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.modal-header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)}
+.modal-header h2{font-size:16px;font-weight:700}
+.modal-close{width:32px;height:32px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);transition:all .15s;font-size:18px}
+.modal-close:hover{background:var(--bg);color:var(--text)}
+.modal-body{padding:24px;max-height:calc(100vh - 200px);overflow-y:auto}
+
+/* Detail sections */
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.detail-item{display:flex;flex-direction:column;gap:3px}
+.detail-item .lbl{font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.5px}
+.detail-item .val{font-size:13px;font-weight:500;color:var(--text)}
+.detail-section{margin-bottom:24px}
+.detail-section h3{font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.detail-section h3 .badge{font-size:11px;font-weight:600;padding:2px 8px;background:var(--primary-light);color:var(--primary);border-radius:20px}
+.msg-list{display:flex;flex-direction:column;gap:10px}
+.msg-bubble{border-radius:var(--radius);padding:12px 16px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+.msg-role{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.msg-system{background:#f0f2f5;border:1px solid var(--border)}
+.msg-system .msg-role{color:var(--text-tertiary)}
+.msg-user{background:var(--primary-light);border:1px solid #d4dbfc}
+.msg-user .msg-role{color:var(--primary)}
+.msg-assistant{background:var(--success-light);border:1px solid #bbf7d0}
+.msg-assistant .msg-role{color:#059669}
+.msg-tool{background:var(--info-light);border:1px solid #c7d2fe}
+.msg-tool .msg-role{color:var(--info)}
+.tools-grid{display:flex;flex-wrap:wrap;gap:6px}
+.tool-chip{padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:20px;font-size:11px;font-weight:500;color:var(--text-secondary)}
+.cost-breakdown{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.cost-box{text-align:center;padding:14px;border-radius:var(--radius);border:1px solid var(--border)}
+.cost-box .lbl{font-size:11px;color:var(--text-tertiary);font-weight:500}
+.cost-box .val{font-size:20px;font-weight:700;margin-top:4px}
+
+.raw-json{background:#f5f7fa;border:1px solid var(--border);border-radius:var(--radius);padding:16px;font-family:'Fira Code',monospace;font-size:12px;max-height:400px;overflow:auto;white-space:pre-wrap;word-break:break-all;color:var(--text-secondary);line-height:1.5}
+
+/* ── LOADING / EMPTY ── */
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px;color:var(--text-tertiary)}
+.spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite;margin-bottom:12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty-state{text-align:center;padding:60px 20px;color:var(--text-tertiary)}
+.empty-state .icon{font-size:36px;margin-bottom:12px}
+.empty-state p{font-size:14px}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px){
+  .stats-row{grid-template-columns:repeat(2,1fr)}
+  .detail-grid{grid-template-columns:1fr}
+  .cost-breakdown{grid-template-columns:1fr}
+  .search-input{min-width:160px}
+}
+@media(max-width:600px){
+  .stats-row{grid-template-columns:1fr}
+  .toolbar{flex-direction:column;align-items:stretch}
+  .main-content{padding:16px}
+  .topbar{padding:0 16px}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ LOGIN VIEW ═══ -->
+<div id="login-view">
+  <div class="login-card">
+    <div class="logo">OR</div>
+    <h1>OpenRouter Traces</h1>
+    <p>Enter your dashboard password to continue</p>
+    <form id="login-form">
+      <input class="login-input" id="login-password" type="password" placeholder="Password" autocomplete="current-password" required/>
+      <button class="login-btn" type="submit">Sign In</button>
+    </form>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- ═══ APP VIEW ═══ -->
+<div id="app-view">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo">OR</div>
+      <h1>Traces Dashboard</h1>
+    </div>
+    <div class="topbar-right">
+      <button class="btn-ghost" id="btn-refresh" title="Refresh">&#x21bb; Refresh</button>
+      <button class="btn-outline" id="btn-logout">Logout</button>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <!-- Stats -->
+    <div class="stats-row" id="stats-row">
+      <div class="stat-card"><div class="label">Total Traces</div><div class="value" id="stat-count">-</div><div class="sub" id="stat-count-sub"></div></div>
+      <div class="stat-card"><div class="label">Total Cost</div><div class="value" id="stat-cost">-</div><div class="sub" id="stat-cost-sub"></div></div>
+      <div class="stat-card"><div class="label">Total Tokens</div><div class="value" id="stat-tokens">-</div><div class="sub" id="stat-tokens-sub"></div></div>
+      <div class="stat-card"><div class="label">Avg Duration</div><div class="value" id="stat-duration">-</div><div class="sub" id="stat-duration-sub"></div></div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <select class="date-select" id="date-select"><option value="">Loading dates...</option></select>
+      <input class="search-input" id="search-input" type="text" placeholder="Search by model, ID, API key..."/>
+      <div class="toolbar-spacer"></div>
+      <span class="page-info" id="page-info"></span>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Model</th>
+            <th>API Key</th>
+            <th>Messages</th>
+            <th>Tokens</th>
+            <th>Cost</th>
+            <th>Duration</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="traces-body"></tbody>
+      </table>
+      <div id="table-loading" class="loading" style="display:none"><div class="spinner"></div>Loading traces...</div>
+      <div id="table-empty" class="empty-state" style="display:none"><div class="icon">&#x1F50D;</div><p>No traces found for this date</p></div>
+    </div>
+
+    <!-- Pagination -->
+    <div class="pagination" id="pagination"></div>
+  </div>
+</div>
+
+<!-- ═══ DETAIL MODAL ═══ -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-title">Trace Detail</h2>
+      <button class="modal-close" id="modal-close">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ── State ──
+  let token = localStorage.getItem('traces_token') || '';
+  let dates = [];
+  let currentDate = '';
+  let currentPage = 1;
+  let pageSize = 20;
+  let totalPages = 1;
+  let totalCount = 0;
+  let summaries = [];
+  let searchTerm = '';
+
+  // ── Elements ──
+  const $loginView = document.getElementById('login-view');
+  const $appView = document.getElementById('app-view');
+  const $loginForm = document.getElementById('login-form');
+  const $loginPassword = document.getElementById('login-password');
+  const $loginError = document.getElementById('login-error');
+  const $dateSelect = document.getElementById('date-select');
+  const $searchInput = document.getElementById('search-input');
+  const $tracesBody = document.getElementById('traces-body');
+  const $tableLoading = document.getElementById('table-loading');
+  const $tableEmpty = document.getElementById('table-empty');
+  const $pagination = document.getElementById('pagination');
+  const $pageInfo = document.getElementById('page-info');
+  const $modalOverlay = document.getElementById('modal-overlay');
+  const $modalBody = document.getElementById('modal-body');
+  const $modalTitle = document.getElementById('modal-title');
+
+  // ── API ──
+  async function api(path, opts = {}) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    const res = await fetch(path, { ...opts, headers: { ...headers, ...(opts.headers||{}) } });
+    if (res.status === 401) { logout(); throw new Error('Unauthorized'); }
+    return res.json();
+  }
+
+  // ── Auth ──
+  async function login(password) {
+    $loginError.textContent = '';
+    try {
+      const data = await api('/api/login', { method: 'POST', body: JSON.stringify({ password }) });
+      if (data.token) {
+        token = data.token;
+        localStorage.setItem('traces_token', token);
+        showApp();
+      } else {
+        $loginError.textContent = data.error || 'Login failed';
+      }
+    } catch(e) {
+      $loginError.textContent = 'Connection error';
+    }
+  }
+
+  function logout() {
+    token = '';
+    localStorage.removeItem('traces_token');
+    $appView.style.display = 'none';
+    $loginView.style.display = 'flex';
+    $loginPassword.value = '';
+  }
+
+  async function showApp() {
+    $loginView.style.display = 'none';
+    $appView.style.display = 'block';
+    await loadDates();
+  }
+
+  // ── Data loading ──
+  async function loadDates() {
+    try {
+      const data = await api('/api/dates');
+      dates = data.dates || [];
+      $dateSelect.innerHTML = '';
+      if (dates.length === 0) {
+        $dateSelect.innerHTML = '<option value="">No dates available</option>';
+        return;
+      }
+      dates.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d; opt.textContent = formatDateLabel(d);
+        $dateSelect.appendChild(opt);
+      });
+      currentDate = dates[0];
+      currentPage = 1;
+      await loadSummaries();
+    } catch(e) {
+      console.error('Failed to load dates', e);
+    }
+  }
+
+  async function loadSummaries() {
+    if (!currentDate) return;
+    $tracesBody.innerHTML = '';
+    $tableEmpty.style.display = 'none';
+    $tableLoading.style.display = 'flex';
+    $pagination.innerHTML = '';
+    try {
+      const data = await api(`/api/summaries?date=${currentDate}&page=${currentPage}&pageSize=${pageSize}`);
+      summaries = data.summaries || [];
+      totalPages = data.totalPages || 1;
+      totalCount = data.totalCount || 0;
+      updateStats();
+      renderTable();
+      renderPagination();
+    } catch(e) {
+      console.error('Failed to load summaries', e);
+    } finally {
+      $tableLoading.style.display = 'none';
+    }
+  }
+
+  // ── Stats ──
+  function updateStats() {
+    const filtered = getFiltered();
+    document.getElementById('stat-count').textContent = totalCount.toLocaleString();
+    document.getElementById('stat-count-sub').textContent = currentDate;
+
+    const totalCost = filtered.reduce((s, t) => s + (t.totalCost || 0), 0);
+    document.getElementById('stat-cost').textContent = '$' + totalCost.toFixed(4);
+    document.getElementById('stat-cost-sub').textContent = 'this page';
+
+    const totalTok = filtered.reduce((s, t) => s + (t.totalTokens || 0), 0);
+    document.getElementById('stat-tokens').textContent = totalTok.toLocaleString();
+    document.getElementById('stat-tokens-sub').textContent = `${filtered.reduce((s,t)=>s+(t.promptTokens||0),0).toLocaleString()} in / ${filtered.reduce((s,t)=>s+(t.completionTokens||0),0).toLocaleString()} out`;
+
+    const durations = filtered.filter(t => t.durationMs).map(t => t.durationMs);
+    const avgDur = durations.length ? (durations.reduce((s,d)=>s+d,0)/durations.length) : 0;
+    document.getElementById('stat-duration').textContent = avgDur ? (avgDur/1000).toFixed(2)+'s' : '-';
+    document.getElementById('stat-duration-sub').textContent = durations.length ? durations.length+' traces with timing' : '';
+  }
+
+  // ── Filtering ──
+  function getFiltered() {
+    if (!searchTerm) return summaries;
+    const q = searchTerm.toLowerCase();
+    return summaries.filter(t =>
+      (t.model||'').toLowerCase().includes(q) ||
+      (t.id||'').toLowerCase().includes(q) ||
+      (t.apiKeyName||'').toLowerCase().includes(q) ||
+      (t.providerName||'').toLowerCase().includes(q) ||
+      (t.filename||'').toLowerCase().includes(q)
+    );
+  }
+
+  // ── Table rendering ──
+  function renderTable() {
+    const filtered = getFiltered();
+    $tracesBody.innerHTML = '';
+    if (filtered.length === 0) {
+      $tableEmpty.style.display = 'block';
+      return;
+    }
+    $tableEmpty.style.display = 'none';
+
+    filtered.forEach(t => {
+      if (t.error) return;
+      const tr = document.createElement('tr');
+      tr.onclick = () => openDetail(t.key);
+
+      const reasonClass = t.finishReason === 'stop' ? 'reason-stop' : t.finishReason === 'length' ? 'reason-length' : t.finishReason === 'tool_calls' ? 'reason-tool_calls' : '';
+
+      tr.innerHTML = `
+        <td><span class="cell-time">${formatTime(t.timestamp)}</span></td>
+        <td><span class="cell-model" title="${esc(t.model)}">${esc(shortModel(t.model))}</span></td>
+        <td>${t.apiKeyName ? '<span class="cell-apikey">'+esc(t.apiKeyName)+'</span>' : '<span class="cell-msgs">-</span>'}</td>
+        <td><span class="cell-msgs">${t.messageCount || 0} msgs</span></td>
+        <td><span class="cell-tokens">${(t.totalTokens||0).toLocaleString()}</span></td>
+        <td><span class="cell-cost">$${(t.totalCost||0).toFixed(5)}</span></td>
+        <td><span class="cell-duration">${t.durationMs ? (t.durationMs/1000).toFixed(2)+'s' : '-'}</span></td>
+        <td><span class="cell-reason ${reasonClass}">${esc(t.finishReason||'-')}</span></td>
+      `;
+      $tracesBody.appendChild(tr);
+    });
+
+    $pageInfo.textContent = `Page ${currentPage} of ${totalPages} (${totalCount} traces)`;
+  }
+
+  // ── Pagination ──
+  function renderPagination() {
+    $pagination.innerHTML = '';
+    if (totalPages <= 1) return;
+
+    const addBtn = (label, page, disabled, active) => {
+      const btn = document.createElement('button');
+      btn.innerHTML = label;
+      btn.disabled = disabled;
+      if (active) btn.classList.add('active');
+      btn.onclick = () => { currentPage = page; loadSummaries(); };
+      $pagination.appendChild(btn);
+    };
+
+    addBtn('&laquo;', 1, currentPage === 1, false);
+    addBtn('&lsaquo;', currentPage - 1, currentPage === 1, false);
+
+    let start = Math.max(1, currentPage - 2);
+    let end = Math.min(totalPages, currentPage + 2);
+    if (end - start < 4) {
+      if (start === 1) end = Math.min(totalPages, start + 4);
+      else start = Math.max(1, end - 4);
+    }
+
+    for (let i = start; i <= end; i++) {
+      addBtn(String(i), i, false, i === currentPage);
+    }
+
+    addBtn('&rsaquo;', currentPage + 1, currentPage === totalPages, false);
+    addBtn('&raquo;', totalPages, currentPage === totalPages, false);
+  }
+
+  // ── Detail modal ──
+  async function openDetail(key) {
+    $modalOverlay.classList.add('open');
+    $modalBody.innerHTML = '<div class="loading"><div class="spinner"></div>Loading trace...</div>';
+    $modalTitle.textContent = 'Trace Detail';
+    try {
+      const data = await api(`/api/trace?key=${encodeURIComponent(key)}`);
+      const raw = data.trace;
+      const t = raw.trace || raw;
+      const obs = t.observations?.[0];
+      $modalTitle.textContent = t.name || 'Trace Detail';
+      renderDetail(t, obs, raw);
+    } catch(e) {
+      $modalBody.innerHTML = '<div class="empty-state"><p>Failed to load trace</p></div>';
+    }
+  }
+
+  function renderDetail(t, obs, raw) {
+    const msgs = t.input?.messages || [];
+    const completion = t.output?.completion || '';
+    const reasoning = t.output?.reasoning || null;
+    const tools = t.output?.rawRequest?.tools || [];
+    const model = obs?.model || t.output?.rawRequest?.model || 'unknown';
+    const dur = obs?.startTime && obs?.endTime ? (new Date(obs.endTime) - new Date(obs.startTime)) : null;
+
+    let html = '';
+
+    // Meta grid
+    html += '<div class="detail-grid">';
+    html += detailItem('Trace ID', t.id);
+    html += detailItem('Timestamp', t.timestamp ? new Date(t.timestamp).toLocaleString() : '-');
+    html += detailItem('Model', model);
+    html += detailItem('Provider', (obs?.providerName||'-') + (obs?.providerSlug ? ' ('+obs.providerSlug+')' : ''));
+    html += detailItem('API Key', t.apiKeyName || '-');
+    html += detailItem('Duration', dur ? (dur/1000).toFixed(2)+'s' : '-');
+    html += detailItem('Finish Reason', obs?.normalizedFinishReason || obs?.finishReason || '-');
+    html += detailItem('Source', t.source || '-');
+    html += '</div>';
+
+    // Cost breakdown
+    if (obs) {
+      html += '<div class="detail-section"><h3>Cost &amp; Tokens</h3>';
+      html += '<div class="cost-breakdown">';
+      html += costBox('Input', '$'+(obs.inputCost||0).toFixed(6), (obs.promptTokens||0).toLocaleString()+' tokens');
+      html += costBox('Output', '$'+(obs.outputCost||0).toFixed(6), (obs.completionTokens||0).toLocaleString()+' tokens');
+      html += costBox('Total', '$'+(obs.totalCost||0).toFixed(5), (obs.totalTokens||0).toLocaleString()+' tokens');
+      html += '</div></div>';
+    }
+
+    // Messages
+    html += '<div class="detail-section"><h3>Conversation <span class="badge">'+msgs.length+' messages</span></h3>';
+    html += '<div class="msg-list">';
+    msgs.forEach(m => {
+      const role = m.role || 'unknown';
+      const cls = role === 'system' ? 'msg-system' : role === 'user' ? 'msg-user' : role === 'assistant' ? 'msg-assistant' : 'msg-tool';
+      let content = '';
+      if (typeof m.content === 'string') content = m.content;
+      else if (Array.isArray(m.content)) content = m.content.map(c => c.text || JSON.stringify(c)).join('\n');
+      else content = JSON.stringify(m.content, null, 2);
+      // Truncate very long system prompts in display
+      const truncated = content.length > 800 ? content.slice(0,800)+'…\n\n[truncated – '+content.length+' chars total]' : content;
+      html += '<div class="msg-bubble '+cls+'"><div class="msg-role">'+esc(role)+'</div>'+esc(truncated)+'</div>';
+    });
+    html += '</div></div>';
+
+    // Completion
+    if (completion) {
+      html += '<div class="detail-section"><h3>Completion</h3>';
+      html += '<div class="msg-bubble msg-assistant"><div class="msg-role">assistant</div>'+esc(completion)+'</div>';
+      html += '</div>';
+    }
+
+    // Reasoning
+    if (reasoning) {
+      html += '<div class="detail-section"><h3>Reasoning</h3>';
+      html += '<div class="msg-bubble msg-tool"><div class="msg-role">reasoning</div>'+esc(reasoning)+'</div>';
+      html += '</div>';
+    }
+
+    // Tools
+    if (tools.length) {
+      html += '<div class="detail-section"><h3>Tools Available <span class="badge">'+tools.length+'</span></h3>';
+      html += '<div class="tools-grid">';
+      tools.forEach(tool => {
+        const name = tool.function?.name || tool.name || 'unknown';
+        html += '<span class="tool-chip" title="'+esc(tool.function?.description||'')+'">'+esc(name)+'</span>';
+      });
+      html += '</div></div>';
+    }
+
+    // Token details
+    if (obs?.promptTokensDetails || obs?.completionTokensDetails) {
+      html += '<div class="detail-section"><h3>Token Details</h3><div class="detail-grid">';
+      if (obs.promptTokensDetails) {
+        html += detailItem('Cached Tokens', (obs.promptTokensDetails.cachedTokens||0).toLocaleString());
+        html += detailItem('Audio Tokens (in)', (obs.promptTokensDetails.audioTokens||0).toLocaleString());
+      }
+      if (obs.completionTokensDetails) {
+        html += detailItem('Reasoning Tokens', (obs.completionTokensDetails.reasoningTokens||0).toLocaleString());
+        html += detailItem('Image Tokens', (obs.completionTokensDetails.imageTokens||0).toLocaleString());
+      }
+      if (obs.inputUnitPrice != null) html += detailItem('Input Price', '$'+obs.inputUnitPrice+'/token');
+      if (obs.outputUnitPrice != null) html += detailItem('Output Price', '$'+obs.outputUnitPrice+'/token');
+      html += '</div></div>';
+    }
+
+    // Raw JSON toggle
+    html += '<div class="detail-section"><h3>Raw JSON</h3>';
+    html += '<button class="btn-outline" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">Toggle Raw JSON</button>';
+    html += '<div class="raw-json" style="display:none">'+esc(JSON.stringify(raw, null, 2))+'</div>';
+    html += '</div>';
+
+    $modalBody.innerHTML = html;
+  }
+
+  function detailItem(label, value) {
+    return '<div class="detail-item"><span class="lbl">'+esc(label)+'</span><span class="val">'+esc(String(value))+'</span></div>';
+  }
+  function costBox(label, cost, tokens) {
+    return '<div class="cost-box"><div class="lbl">'+esc(label)+'</div><div class="val">'+esc(cost)+'</div><div class="lbl" style="margin-top:4px">'+esc(tokens)+'</div></div>';
+  }
+
+  // ── Helpers ──
+  function formatDateLabel(d) {
+    try { return new Date(d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',year:'numeric',month:'short',day:'numeric'}); }
+    catch { return d; }
+  }
+  function formatTime(ts) {
+    if (!ts) return '-';
+    try { return new Date(ts).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+    catch { return ts; }
+  }
+  function shortModel(m) {
+    if (!m) return 'unknown';
+    return m.length > 30 ? m.split('/').pop() : m;
+  }
+  function esc(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  // ── Events ──
+  $loginForm.addEventListener('submit', e => { e.preventDefault(); login($loginPassword.value); });
+  document.getElementById('btn-logout').addEventListener('click', logout);
+  document.getElementById('btn-refresh').addEventListener('click', () => { currentPage = 1; loadSummaries(); });
+  document.getElementById('modal-close').addEventListener('click', () => $modalOverlay.classList.remove('open'));
+  $modalOverlay.addEventListener('click', e => { if (e.target === $modalOverlay) $modalOverlay.classList.remove('open'); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') $modalOverlay.classList.remove('open'); });
+
+  $dateSelect.addEventListener('change', () => {
+    currentDate = $dateSelect.value;
+    currentPage = 1;
+    loadSummaries();
+  });
+
+  let searchTimer;
+  $searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      searchTerm = $searchInput.value.trim();
+      renderTable();
+      updateStats();
+    }, 250);
+  });
+
+  // ── Init ──
+  if (token) {
+    api('/api/dates').then(() => showApp()).catch(() => {
+      token = '';
+      localStorage.removeItem('traces_token');
+    });
+  }
+})();
+</script>
+</body>
+</html>

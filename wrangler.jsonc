@@ -1,0 +1,27 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "openrouter-r2-traces-frontend",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-02-10",
+	"compatibility_flags": [
+		"global_fetch_strictly_public"
+	],
+	"assets": {
+		"directory": "./public",
+		"binding": "ASSETS"
+	},
+	"observability": {
+		"enabled": true
+	},
+	"r2_buckets": [
+		{
+			"binding": "TRACES_BUCKET",
+			"bucket_name": "openrouter-logs"
+		}
+	]
+	// Secret DASHBOARD_PASSWORD must be set via: npx wrangler secret put DASHBOARD_PASSWORD
+}
