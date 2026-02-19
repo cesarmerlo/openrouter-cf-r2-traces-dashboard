@@ -20,7 +20,7 @@
 	"r2_buckets": [
 		{
 			"binding": "TRACES_BUCKET",
-			"bucket_name": "openrouter-logs"
+			"bucket_name": "openrouter-traces"
 		}
 	]
 	// Secret DASHBOARD_PASSWORD must be set via: npx wrangler secret put DASHBOARD_PASSWORD

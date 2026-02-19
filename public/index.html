@@ -114,6 +114,7 @@ tbody tr:hover{background:#f5f7ff}
 .modal{background:var(--surface);border-radius:var(--radius-lg);width:100%;max-width:960px;box-shadow:var(--shadow-lg);animation:modalIn .2s ease}
 @keyframes modalIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .modal-header{display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)}
+.modal-header-actions{display:flex;align-items:center;gap:8px}
 .modal-header h2{font-size:16px;font-weight:700}
 .modal-close{width:32px;height:32px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);transition:all .15s;font-size:18px}
 .modal-close:hover{background:var(--bg);color:var(--text)}
@@ -274,7 +275,10 @@ tbody tr:hover{background:#f5f7ff}
   <div class="modal">
     <div class="modal-header">
       <h2 id="modal-title">Trace Detail</h2>
-      <button class="modal-close" id="modal-close">&times;</button>
+      <div class="modal-header-actions">
+        <button class="btn-outline" id="btn-copy-modal-json" title="Copy visible detail as JSON">Copy JSON</button>
+        <button class="modal-close" id="modal-close">&times;</button>
+      </div>
     </div>
     <div class="modal-body" id="modal-body"></div>
   </div>
@@ -293,6 +297,7 @@ tbody tr:hover{background:#f5f7ff}
   let summaries = [];
   let searchTerm = '';
   let sortOrder = 'desc';
+  let currentDetailClipboardData = null;
 
   // ── Elements ──
   const $loginView = document.getElementById('login-view');
@@ -311,6 +316,7 @@ tbody tr:hover{background:#f5f7ff}
   const $modalOverlay = document.getElementById('modal-overlay');
   const $modalBody = document.getElementById('modal-body');
   const $modalTitle = document.getElementById('modal-title');
+  const $btnCopyModalJson = document.getElementById('btn-copy-modal-json');
 
   // ── API ──
   async function api(path, opts = {}) {
@@ -565,6 +571,7 @@ tbody tr:hover{background:#f5f7ff}
     html += '<div class="detail-section"><h3>Conversation <span class="badge">'+msgs.length+' messages</span></h3>';
     html += '<div class="msg-list">';
     const renderedToolIds = new Set();
+    const conversationForClipboard = [];
     msgs.forEach(m => {
       const role = m.role || 'unknown';
 
@@ -575,6 +582,7 @@ tbody tr:hover{background:#f5f7ff}
         if (typeof m.content === 'string' && m.content.trim()) assistantText = m.content;
         if (assistantText) {
           html += '<div class="msg-bubble msg-assistant"><div class="msg-role">assistant</div>'+esc(assistantText)+'</div>';
+          conversationForClipboard.push({ type: 'message', role: 'assistant', content: assistantText });
         }
         // Render each tool call as a grouped card with its response
         m.tool_calls.forEach(tc => {
@@ -618,6 +626,14 @@ tbody tr:hover{background:#f5f7ff}
             html += '</div>';
           }
 
+          conversationForClipboard.push({
+            type: 'tool_call',
+            toolName: fnName,
+            toolCallId: tcId || null,
+            arguments: prettyArgs,
+            response: responseContent !== undefined ? String(responseContent) : null
+          });
+
           html += '</div>'; // end tool-call-group
         });
         return;
@@ -654,6 +670,12 @@ tbody tr:hover{background:#f5f7ff}
         html += '<div class="'+(isError ? 'tool-response-err' : 'tool-response-ok')+'">'+esc(prettyResponse)+'</div>';
         html += '</div>';
         html += '</div>';
+        conversationForClipboard.push({
+          type: 'tool_response',
+          toolName: fnName,
+          toolCallId: m.tool_call_id || null,
+          response: responseContent
+        });
         return;
       }
 
@@ -667,6 +689,7 @@ tbody tr:hover{background:#f5f7ff}
       // Truncate very long system prompts in display
       const truncated = content.length > 800 ? content.slice(0,800)+'…\n\n[truncated – '+content.length+' chars total]' : content;
       html += '<div class="msg-bubble '+cls+'"><div class="msg-role">'+esc(role)+'</div>'+esc(truncated)+'</div>';
+      conversationForClipboard.push({ type: 'message', role, content: truncated });
     });
     html += '</div></div>';
 
@@ -694,6 +717,18 @@ tbody tr:hover{background:#f5f7ff}
       });
       html += '</div></div>';
     }
+
+    currentDetailClipboardData = {
+      traceId: t.id || null,
+      traceName: t.name || null,
+      timestamp: t.timestamp || null,
+      model,
+      conversation: conversationForClipboard,
+      toolsAvailable: tools.map(tool => ({
+        name: tool.function?.name || tool.name || 'unknown',
+        description: tool.function?.description || null
+      }))
+    };
 
     // Token details
     if (obs?.promptTokensDetails || obs?.completionTokensDetails) {
@@ -748,13 +783,50 @@ tbody tr:hover{background:#f5f7ff}
     return d.innerHTML;
   }
 
+  async function copyCurrentDetailAsJson() {
+    if (!currentDetailClipboardData) return;
+    const previousText = $btnCopyModalJson.textContent;
+    const payload = JSON.stringify(currentDetailClipboardData, null, 2);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(payload);
+      } else {
+        const tmp = document.createElement('textarea');
+        tmp.value = payload;
+        document.body.appendChild(tmp);
+        tmp.select();
+        document.execCommand('copy');
+        tmp.remove();
+      }
+      $btnCopyModalJson.textContent = 'Copied!';
+      setTimeout(() => { $btnCopyModalJson.textContent = previousText; }, 1200);
+    } catch (e) {
+      $btnCopyModalJson.textContent = 'Copy failed';
+      setTimeout(() => { $btnCopyModalJson.textContent = previousText; }, 1500);
+    }
+  }
+
   // ── Events ──
   $loginForm.addEventListener('submit', e => { e.preventDefault(); login($loginPassword.value); });
   document.getElementById('btn-logout').addEventListener('click', logout);
   document.getElementById('btn-refresh').addEventListener('click', () => { currentPage = 1; loadSummaries(); });
-  document.getElementById('modal-close').addEventListener('click', () => $modalOverlay.classList.remove('open'));
-  $modalOverlay.addEventListener('click', e => { if (e.target === $modalOverlay) $modalOverlay.classList.remove('open'); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') $modalOverlay.classList.remove('open'); });
+  $btnCopyModalJson.addEventListener('click', copyCurrentDetailAsJson);
+  document.getElementById('modal-close').addEventListener('click', () => {
+    currentDetailClipboardData = null;
+    $modalOverlay.classList.remove('open');
+  });
+  $modalOverlay.addEventListener('click', e => {
+    if (e.target === $modalOverlay) {
+      currentDetailClipboardData = null;
+      $modalOverlay.classList.remove('open');
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      currentDetailClipboardData = null;
+      $modalOverlay.classList.remove('open');
+    }
+  });
 
   $dateSelect.addEventListener('change', () => {
     currentDate = $dateSelect.value;
